@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Castle Gate — a persuasion adventure judged by AI</title>
+<style>
+  :root{
+    --gold:#d4a94e; --gold-dim:#8a6d2f; --ink:#f0e6d2; --ink-dim:#b9a888;
+    --panel:rgba(12,10,20,.88); --panel-border:rgba(212,169,78,.35);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:#07060d; color:var(--ink);
+    font-family:Georgia,'Times New Roman',serif;
+    overflow:hidden;
+  }
+  .screen{position:fixed; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; z-index:10;}
+  .hidden{display:none !important;}
+
+  /* ---------- title screen ---------- */
+  #screen-title{background:radial-gradient(ellipse at 50% 30%, #1b1633 0%, #07060d 70%);}
+  #screen-title h1{
+    font-size:clamp(2.2rem,6vw,4.2rem); letter-spacing:.08em; color:var(--gold);
+    text-shadow:0 0 30px rgba(212,169,78,.35); text-align:center; padding:0 1rem;
+  }
+  #screen-title h2{
+    margin-top:.6rem; font-size:clamp(1rem,2.4vw,1.4rem); font-weight:normal;
+    color:var(--ink-dim); font-style:italic; text-align:center; padding:0 1.5rem;
+  }
+  .btn{
+    margin-top:2rem; padding:.9rem 2.6rem; font-size:1.15rem; cursor:pointer;
+    font-family:inherit; letter-spacing:.06em;
+    color:#0b0912; background:linear-gradient(180deg,#e8c46a,#c79a3a);
+    border:1px solid #f4dd9a; border-radius:8px;
+    box-shadow:0 4px 24px rgba(212,169,78,.35);
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .btn:hover{transform:translateY(-2px); box-shadow:0 8px 32px rgba(212,169,78,.5);}
+  .btn:disabled{opacity:.5; cursor:wait; transform:none;}
+  .btn-ghost{
+    margin-top:1rem; padding:.6rem 1.4rem; font-size:.95rem; cursor:pointer;
+    font-family:inherit; color:var(--ink-dim); background:transparent;
+    border:1px solid var(--panel-border); border-radius:8px;
+  }
+  .btn-ghost:hover{color:var(--ink); border-color:var(--gold);}
+  #how-it-works{
+    margin-top:2.2rem; max-width:620px; padding:0 1.5rem; text-align:center;
+    color:var(--ink-dim); font-size:.95rem; line-height:1.6;
+  }
+  #how-it-works b{color:var(--gold); font-weight:normal;}
+  #demo-banner{
+    margin-top:1rem; padding:.5rem 1rem; border:1px dashed var(--gold-dim);
+    border-radius:6px; color:var(--gold); font-size:.85rem; display:none;
+  }
+
+  /* ---------- game screen ---------- */
+  #scene-bg{position:fixed; inset:0; background-size:cover; background-position:center;
+    animation:kenburns 24s ease-in-out infinite alternate; z-index:0;}
+  @keyframes kenburns{from{transform:scale(1);} to{transform:scale(1.08);}}
+  #rain{position:fixed; inset:0; z-index:1; pointer-events:none; opacity:0; transition:opacity 1.5s;}
+  #torch-glow{position:fixed; inset:0; z-index:2; pointer-events:none; opacity:0; transition:opacity 1.5s;
+    background:radial-gradient(ellipse at 50% 100%, rgba(255,150,40,.14), transparent 60%);}
+  #torch-glow.flicker{animation:flicker 3s ease-in-out infinite;}
+  @keyframes flicker{0%,100%{opacity:.85;} 30%{opacity:.65;} 55%{opacity:.95;} 80%{opacity:.7;}}
+  #vignette{position:fixed; inset:0; z-index:3; pointer-events:none;
+    background:radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,.55) 100%);}
+  #flash{position:fixed; inset:0; z-index:8; pointer-events:none; opacity:0;
+    background:radial-gradient(ellipse at center, rgba(255,220,130,.9), rgba(212,169,78,.25) 70%);}
+  #flash.go{animation:flashgo 1.2s ease-out;}
+  @keyframes flashgo{0%{opacity:0;} 25%{opacity:1;} 100%{opacity:0;}}
+  #app.shake #screen-game{animation:shake .5s;}
+  @keyframes shake{0%,100%{transform:translateX(0);} 20%{transform:translateX(-12px);}
+    40%{transform:translateX(10px);} 60%{transform:translateX(-7px);} 80%{transform:translateX(5px);}}
+
+  #hud{position:fixed; top:0; left:0; right:0; z-index:11; display:flex;
+    justify-content:space-between; align-items:center; padding:.9rem 1.4rem;
+    font-size:.95rem; color:var(--ink-dim); letter-spacing:.05em;
+    background:linear-gradient(180deg, rgba(5,4,10,.75), transparent);}
+  #hud b{color:var(--gold); font-weight:normal;}
+
+  #dialogue-panel{
+    position:fixed; left:50%; transform:translateX(-50%); bottom:0; z-index:11;
+    width:min(860px, 94vw); margin-bottom:1.2rem;
+    background:var(--panel); border:1px solid var(--panel-border); border-radius:12px;
+    padding:1.2rem 1.4rem 1.3rem; backdrop-filter:blur(6px);
+    box-shadow:0 12px 48px rgba(0,0,0,.6);
+    max-height:62vh; overflow-y:auto;
+  }
+  #npc-name{color:var(--gold); letter-spacing:.1em; font-size:.85rem; margin-bottom:.5rem;
+    text-transform:uppercase;}
+  #npc-text{min-height:3.2em; line-height:1.65; font-size:1.05rem;}
+  #npc-text .caret{display:inline-block; width:.6em; animation:blink 1s steps(1) infinite; color:var(--gold);}
+  @keyframes blink{50%{opacity:0;}}
+
+  #meter-wrap{margin:1rem 0 .4rem; display:none;}
+  #meter-track{height:22px; border-radius:11px; background:#241d12;
+    border:1px solid var(--panel-border); overflow:hidden; position:relative;}
+  #meter-fill{height:100%; width:0%;
+    background:linear-gradient(90deg,#b3402e,#d4a94e 55%,#7fc76a);
+    transition:width 1.4s cubic-bezier(.2,.7,.2,1); border-radius:11px;}
+  #meter-label{display:flex; justify-content:space-between; margin-top:.35rem;
+    font-size:.9rem; color:var(--ink-dim);}
+  #meter-pct{color:var(--gold); font-size:1.05rem;}
+
+  #input-row{display:flex; gap:.6rem; margin-top:.9rem;}
+  #player-input{
+    flex:1; padding:.8rem 1rem; font-size:1rem; font-family:inherit;
+    color:var(--ink); background:#171224; border:1px solid var(--panel-border);
+    border-radius:8px; outline:none;
+  }
+  #player-input:focus{border-color:var(--gold); box-shadow:0 0 0 2px rgba(212,169,78,.2);}
+  #persuade-btn{
+    padding:.8rem 1.6rem; font-size:1rem; cursor:pointer; font-family:inherit;
+    color:#0b0912; background:linear-gradient(180deg,#e8c46a,#c79a3a);
+    border:1px solid #f4dd9a; border-radius:8px; white-space:nowrap;
+  }
+  #persuade-btn:disabled{opacity:.5; cursor:wait;}
+  #result-line{margin-top:.8rem; font-size:.98rem; line-height:1.55; min-height:1.5em;}
+  #result-line .burned-tag{color:#ff9d5c;}
+  #next-btn{display:none; margin-top:.9rem;}
+
+  /* ---------- victory ---------- */
+  #screen-victory{background:radial-gradient(ellipse at 50% 30%, #241a08 0%, #07060d 70%);}
+  #screen-victory h1{color:var(--gold); font-size:clamp(1.8rem,5vw,3rem); text-align:center; padding:0 1rem;}
+  #victory-sub{margin-top:.8rem; color:var(--ink-dim); font-style:italic; text-align:center; padding:0 1.5rem;}
+  #victory-stats{margin-top:1.4rem; font-size:1.1rem; color:var(--ink);}
+  #victory-stats b{color:var(--gold); font-weight:normal;}
+
+  /* ---------- hall of fame ---------- */
+  #hof-modal{position:fixed; inset:0; z-index:30; display:flex; align-items:center;
+    justify-content:center; background:rgba(4,3,8,.8); backdrop-filter:blur(4px);}
+  #hof-box{width:min(640px,92vw); max-height:80vh; overflow-y:auto;
+    background:#12101c; border:1px solid var(--panel-border); border-radius:12px; padding:1.5rem;}
+  #hof-box h2{color:var(--gold); letter-spacing:.08em; margin-bottom:.3rem;}
+  #hof-box p.sub{color:var(--ink-dim); font-size:.9rem; margin-bottom:1rem; font-style:italic;}
+  .hof-entry{border-left:3px solid var(--gold-dim); padding:.6rem .9rem; margin-bottom:.8rem;
+    background:rgba(212,169,78,.05); border-radius:0 8px 8px 0;}
+  .hof-entry .scene{font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; color:var(--gold);}
+  .hof-entry .line{margin-top:.25rem; line-height:1.5;}
+  .hof-entry .at{font-size:.78rem; color:var(--ink-dim); margin-top:.25rem;}
+  .hof-empty{color:var(--ink-dim); font-style:italic;}
+  #hof-close{margin-top:1rem;}
+</style>
+</head>
+<body id="app">
+
+  <!-- TITLE -->
+  <div id="screen-title" class="screen">
+    <h1>⚔ CASTLE GATE ⚔</h1>
+    <h2>A persuasion adventure where an AI judges your words.<br>The probability <i>is</i> the dice roll.</h2>
+    <button class="btn" id="start-btn">Begin the Night</button>
+    <button class="btn-ghost" id="hof-btn">🏆 Hall of Fame</button>
+    <div id="demo-banner">DEMO MODE — judgments are simulated, no Drex calls, Hall of Fame is local only.</div>
+    <div id="how-it-works">
+      Three souls stand between you and dawn: a <b>guard</b>, a <b>merchant</b>, a <b>queen</b>.
+      They've heard every lie ever told — tricks, flattery and bribes won't work.
+      Type what you say to each of them. Every line is judged by <b>Drex</b>, a System&nbsp;1
+      decision model — it returns the probability your words are <b>sincere and genuinely moving</b>,
+      and that number decides your fate.<br>
+      Win with a line and it gets <b>burned</b> — immortalized in the Hall of Fame, never usable again.
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div id="screen-game" class="screen hidden">
+    <div id="scene-bg"></div>
+    <canvas id="rain"></canvas>
+    <div id="torch-glow"></div>
+    <div id="vignette"></div>
+    <div id="flash"></div>
+    <div id="hud">
+      <span id="hud-scene">Scene <b>1</b> / 3</span>
+      <span id="hud-attempts">Attempts: <b>0</b></span>
+    </div>
+    <div id="dialogue-panel">
+      <div id="npc-name"></div>
+      <div id="npc-text"></div>
+      <div id="meter-wrap">
+        <div id="meter-track"><div id="meter-fill"></div></div>
+        <div id="meter-label"><span>Drex judgment — P(sincere &amp; genuine)</span><span id="meter-pct">0%</span></div>
+      </div>
+      <div id="input-row">
+        <input id="player-input" maxlength="500" placeholder="Type what you say…" autocomplete="off">
+        <button id="persuade-btn">Persuade!</button>
+      </div>
+      <div id="result-line"></div>
+      <button class="btn" id="next-btn">Continue →</button>
+    </div>
+  </div>
+
+  <!-- VICTORY -->
+  <div id="screen-victory" class="screen hidden">
+    <h1>🌅 Dawn breaks over the castle.</h1>
+    <div id="victory-sub">The guard stepped aside. The merchant relented. The queen granted your plea.</div>
+    <div id="victory-stats"></div>
+    <button class="btn" id="again-btn">Play Again</button>
+    <button class="btn-ghost" id="hof-btn2">🏆 Hall of Fame</button>
+  </div>
+
+  <!-- HALL OF FAME -->
+  <div id="hof-modal" class="hidden">
+    <div id="hof-box">
+      <h2>🏆 Hall of Fame</h2>
+      <p class="sub">Every winning line, immortalized — and burned. These can never win again.</p>
+      <div id="hof-list"></div>
+      <button class="btn-ghost" id="hof-close">Close</button>
+    </div>
+  </div>
+
+<script src="config.js"></script>
+<script>
+"use strict";
+const BACKEND = (window.CASTLE_GATE_BACKEND || "http://localhost:8080").replace(/\/$/, "");
+const SCENE_ORDER = ["gate", "merchant", "throne"];
+const SCENE_ART = {
+  gate: "assets/media-generation-scene1-castle-gate-0-2da50a39-c932-4095-a649-6582b6e46fab.webp",
+  merchant: "assets/media-generation-scene2-merchant-0-76e40275-4309-47a8-b694-3fe48398c940.webp",
+  throne: "assets/media-generation-scene3-throne-room-0-076209de-f195-47a8-a1f7-166cf9a7cccb.webp",
+};
+const SCENE_TITLES = { gate: "The Castle Gate", merchant: "The Merchant's Stall", throne: "The Throne Room" };
+
+// Fallback scene text if the backend can't be reached (demo mode still plays).
+const SCENE_FALLBACK = {
+  gate: { npc: "Brom, castle guard", threshold: 0.60,
+    brief: "Midnight. Rain hammers the cobblestones. Brom the guard stands before the castle gate, spear crossed. No one enters after dark — unless your words change his mind." },
+  merchant: { npc: "Sarella, merchant", threshold: 0.60,
+    brief: "Dusk in the market square. Sarella guards her wares — and her prices — fiercely. You need the silver amulet but haven't the coin. Only honeyed words will move her." },
+  throne: { npc: "Queen Maren", threshold: 0.65,
+    brief: "Torchlight flickers in the throne room. Queen Maren hears petitioners from her stone throne. You beg soldiers to defend the village. She respects strength and despises flattery." },
+};
+
+const REACTIONS = {
+  gate: {
+    cold: ['Brom stifles a yawn. "Heard better from a tax collector."',
+            '"No." A pause. "...Was that meant to persuade me?"'],
+    warm: ['Brom scratches his beard. "Go on... I\'m listening."',
+            '"Hm. That\'s... almost convincing. Almost."'],
+    win:  ['Brom steps aside, spear lowered. "Fine. FINE. But if the captain asks — you never saw me."'],
+  },
+  merchant: {
+    cold: ['Sarella laughs, a sound like coins in a purse. "Darling, flattery won\'t pay my rent."',
+            '"Cute. The price just went up."'],
+    warm: ['Sarella taps her chin. "You drive a hard bargain... keep talking."',
+            '"Hm. For you... maybe. Convince me a little more."'],
+    win:  ['Sarella sighs dramatically and pushes the amulet across the counter. "You rob me! Take it, take it!"'],
+  },
+  throne: {
+    cold: ['"Guards," the Queen says flatly. "...No, wait. Let me hear how this ends. It won\'t."',
+            'The Queen doesn\'t blink. "Is that fear I smell? It should be."'],
+    warm: ['"Bold," Maren admits. "Few dare speak to me so plainly. Continue — carefully."',
+            'The Queen leans forward, just slightly. "You have my attention. Do not waste it."'],
+    win:  ['Queen Maren rises. "You speak like a leader. Take my soldiers — and do not make me regret this."'],
+  },
+};
+
+let scenes = {}, sceneIdx = 0, attemptsThisScene = 0, totalAttempts = 0;
+let demoMode = false, typeTimer = null;
+
+const $ = id => document.getElementById(id);
+
+/* ---------------- typewriter ---------------- */
+function typewrite(el, text, speed = 22) {
+  clearInterval(typeTimer);
+  el.innerHTML = "";
+  let i = 0;
+  typeTimer = setInterval(() => {
+    i++;
+    el.innerHTML = escapeHtml(text.slice(0, i)) + '<span class="caret">▌</span>';
+    if (i >= text.length) { clearInterval(typeTimer); el.innerHTML = escapeHtml(text); }
+  }, speed);
+}
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/* ---------------- rain canvas ---------------- */
+const rain = $("rain"), rctx = rain.getContext("2d");
+let drops = [];
+function sizeRain() {
+  rain.width = innerWidth; rain.height = innerHeight;
+  drops = Array.from({ length: 130 }, () => ({
+    x: Math.random() * rain.width, y: Math.random() * rain.height,
+    l: 10 + Math.random() * 14, v: 9 + Math.random() * 7,
+  }));
+}
+addEventListener("resize", sizeRain); sizeRain();
+(function rainLoop() {
+  rctx.clearRect(0, 0, rain.width, rain.height);
+  rctx.strokeStyle = "rgba(170,190,220,.35)"; rctx.lineWidth = 1;
+  rctx.beginPath();
+  for (const d of drops) {
+    rctx.moveTo(d.x, d.y); rctx.lineTo(d.x - 2, d.y + d.l);
+    d.y += d.v; d.x -= 1;
+    if (d.y > rain.height) { d.y = -20; d.x = Math.random() * rain.width; }
+  }
+  rctx.stroke();
+  requestAnimationFrame(rainLoop);
+})();
+
+/* ---------------- screens ---------------- */
+function show(id) {
+  for (const s of ["screen-title", "screen-game", "screen-victory"])
+    $(s).classList.toggle("hidden", s !== id);
+}
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function startScene() {
+  const sid = SCENE_ORDER[sceneIdx];
+  const sc = scenes[sid];
+  attemptsThisScene = 0;
+  $("hud-scene").innerHTML = `Scene <b>${sceneIdx + 1}</b> / 3 — ${SCENE_TITLES[sid]}`;
+  $("hud-attempts").innerHTML = `Attempts: <b>0</b>`;
+  $("scene-bg").style.backgroundImage = `url("${SCENE_ART[sid]}")`;
+  $("rain").style.opacity = sid === "gate" ? 1 : 0;
+  const glow = $("torch-glow");
+  glow.style.opacity = sid === "merchant" ? 0 : 1;
+  glow.classList.toggle("flicker", sid !== "merchant");
+  $("npc-name").textContent = sc.npc;
+  $("meter-wrap").style.display = "none";
+  $("meter-fill").style.width = "0%";
+  $("meter-pct").textContent = "0%";
+  $("result-line").innerHTML = "";
+  $("next-btn").style.display = "none";
+  $("player-input").value = "";
+  $("player-input").disabled = false;
+  $("persuade-btn").disabled = false;
+  show("screen-game");
+  typewrite($("npc-text"), sc.brief);
+  setTimeout(() => $("player-input").focus(), 400);
+}
+
+/* ---------------- judging ---------------- */
+function mockJudge(text) {
+  // Mirrors the server's MOCK_DREX formula for offline demo play.
+  const stop = new Set("a an the and or but of to in on at for with please just really very so my me i you your he she it we they".split(" "));
+  const words = text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w && !stop.has(w));
+  let h = 0;
+  for (const c of text) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const base = 0.25 + Math.min(words.length / 30, 1) * 0.45;
+  const jitter = (h % 100) / 100 * 0.2;
+  return Math.round(Math.min(Math.max(base + jitter, 0.02), 0.98) * 1000) / 1000;
+}
+const localBurned = {}; // demo-mode burned lines (per browser only)
+
+async function judge() {
+  const sid = SCENE_ORDER[sceneIdx];
+  const sc = scenes[sid];
+  const text = $("player-input").value.trim();
+  if (!text) return;
+  $("persuade-btn").disabled = true;
+  $("player-input").disabled = true;
+  $("result-line").innerHTML = "<i>Judging…</i>";
+  $("meter-wrap").style.display = "block";
+  $("meter-fill").style.transition = "none";
+  $("meter-fill").style.width = "0%";
+  $("meter-pct").textContent = "0%";
+  // force reflow so the fill animates from 0 again
+  void $("meter-fill").offsetWidth;
+  $("meter-fill").style.transition = "";
+
+  let res;
+  try {
+    if (demoMode) {
+      await new Promise(r => setTimeout(r, 900)); // dramatic pause
+      const norm = text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+      if ((localBurned[sid] || []).includes(norm)) {
+        res = { burned: true, message: "That line already won — be more original!" };
+      } else {
+        const p = mockJudge(text);
+        res = { burned: false, probability: p, threshold: sc.threshold, success: p >= sc.threshold };
+        if (res.success) { (localBurned[sid] = localBurned[sid] || []).push(norm); }
+      }
+    } else {
+      const r = await fetch(BACKEND + "/api/judge", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scene: sid, text }),
+      });
+      res = await r.json();
+    }
+  } catch (e) {
+    $("result-line").innerHTML = `<span style="color:#ff9d5c">Couldn't reach the game server. Check that the backend is running.</span>`;
+    $("persuade-btn").disabled = false;
+    $("player-input").disabled = false;
+    return;
+  }
+
+  attemptsThisScene++; totalAttempts++;
+  $("hud-attempts").innerHTML = `Attempts: <b>${attemptsThisScene}</b>`;
+
+  if (res.burned) {
+    $("result-line").innerHTML =
+      `<span class="burned-tag">🔥 ${escapeHtml(res.message || "That line already won.")}</span>` +
+      (res.matched ? `<br><span style="color:var(--ink-dim);font-size:.9em">Hall of Fame: “${escapeHtml(res.matched)}”</span>` : "");
+    $("player-input").disabled = false;
+    $("persuade-btn").disabled = false;
+    $("player-input").value = "";
+    $("player-input").focus();
+    return;
+  }
+  if (res.error) {
+    $("result-line").innerHTML = `<span style="color:#ff9d5c">Error: ${escapeHtml(res.error)}</span>`;
+    $("persuade-btn").disabled = false;
+    $("player-input").disabled = false;
+    return;
+  }
+
+  const p = res.probability, pct = Math.round(p * 100);
+  // animate meter
+  requestAnimationFrame(() => { $("meter-fill").style.width = pct + "%"; });
+  let shown = 0;
+  const counter = setInterval(() => {
+    shown += Math.max(1, Math.round(pct / 40));
+    if (shown >= pct) { shown = pct; clearInterval(counter); }
+    $("meter-pct").textContent = shown + "%";
+  }, 35);
+
+  setTimeout(() => {
+    if (res.success) {
+      $("flash").classList.remove("go");
+      void $("flash").offsetWidth;
+      $("flash").classList.add("go");
+      typewrite($("npc-text"), pick(REACTIONS[sid].win), 18);
+      $("result-line").innerHTML =
+        `<b style="color:var(--gold)">✔ Rang true at ${pct}%!</b> Your line is burned into the ` +
+        `<a href="#" id="hof-link" style="color:var(--gold)">Hall of Fame</a> — no one can ever use it again.`;
+      $("next-btn").style.display = "inline-block";
+      $("next-btn").onclick = () => {
+        sceneIdx++;
+        if (sceneIdx >= SCENE_ORDER.length) victory();
+        else startScene();
+      };
+      const hl = $("hof-link");
+      if (hl) hl.onclick = e => { e.preventDefault(); openHof(); };
+    } else {
+      $("app").classList.remove("shake");
+      void $("app").offsetWidth;
+      $("app").classList.add("shake");
+      const band = p < 0.35 ? "cold" : "warm";
+      typewrite($("npc-text"), pick(REACTIONS[sid][band]), 18);
+      $("result-line").innerHTML =
+        `<span style="color:var(--ink-dim)">Didn't ring true — <b style="color:var(--gold)">${pct}%</b> ` +
+        `(needed ${Math.round(res.threshold * 100)}%). These three smell a lie a mile off — try honesty.</span>`;
+      $("player-input").disabled = false;
+      $("persuade-btn").disabled = false;
+      $("player-input").value = "";
+      $("player-input").focus();
+    }
+  }, 1600);
+}
+
+/* ---------------- hall of fame ---------------- */
+async function openHof() {
+  $("hof-modal").classList.remove("hidden");
+  const list = $("hof-list");
+  list.innerHTML = "<p class='hof-empty'>Loading…</p>";
+  let winners = [];
+  try {
+    if (demoMode) {
+      for (const sid of SCENE_ORDER)
+        for (const t of (localBurned[sid] || []))
+          winners.push({ scene: sid, text: t, at: "this session" });
+    } else {
+      const r = await fetch(BACKEND + "/api/hall-of-fame");
+      winners = (await r.json()).winners || [];
+    }
+  } catch (e) { /* fall through to empty */ }
+  if (!winners.length) {
+    list.innerHTML = "<p class='hof-empty'>No legends yet. Be the first.</p>";
+    return;
+  }
+  list.innerHTML = winners.map(w => `
+    <div class="hof-entry">
+      <div class="scene">${escapeHtml(SCENE_TITLES[w.scene] || w.scene)}</div>
+      <div class="line">“${escapeHtml(w.text)}”</div>
+      <div class="at">${escapeHtml(w.at || "")}</div>
+    </div>`).join("");
+}
+
+/* ---------------- victory ---------------- */
+function victory() {
+  show("screen-victory");
+  const grade = totalAttempts <= 6 ? "Silver-tongued legend 🥇"
+    : totalAttempts <= 12 ? "Smooth talker 🥈" : "Persistent... very persistent 🥉";
+  $("victory-stats").innerHTML =
+    `Completed in <b>${totalAttempts}</b> attempts — <b>${grade}</b>`;
+}
+
+/* ---------------- boot ---------------- */
+async function boot() {
+  try {
+    const r = await fetch(BACKEND + "/api/scenes");
+    if (!r.ok) throw new Error("bad status");
+    const data = await r.json();
+    for (const sid of SCENE_ORDER) {
+      scenes[sid] = {
+        npc: data[sid].npc, brief: data[sid].brief, threshold: data[sid].threshold,
+      };
+    }
+  } catch (e) {
+    // Backend unreachable → offer demo mode rather than a dead page.
+    demoMode = true;
+    scenes = JSON.parse(JSON.stringify(SCENE_FALLBACK));
+    $("demo-banner").style.display = "block";
+  }
+  $("start-btn").onclick = () => { sceneIdx = 0; totalAttempts = 0; startScene(); };
+  $("again-btn").onclick = () => { sceneIdx = 0; totalAttempts = 0; startScene(); };
+  $("persuade-btn").onclick = judge;
+  $("player-input").addEventListener("keydown", e => { if (e.key === "Enter") judge(); });
+  $("next-btn").onclick = () => {};
+  $("hof-btn").onclick = openHof;
+  $("hof-btn2").onclick = openHof;
+  $("hof-close").onclick = () => $("hof-modal").classList.add("hidden");
+  $("hof-modal").addEventListener("click", e => {
+    if (e.target.id === "hof-modal") $("hof-modal").classList.add("hidden");
+  });
+}
+boot();
+</script>
+</body>
+</html>
