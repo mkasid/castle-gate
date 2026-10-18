@@ -1,0 +1,13 @@
+# Render Blueprint — deploy the backend from this repo in one click.
+# In Render: New → Blueprint → connect the repo containing this file.
+services:
+  - type: web
+    name: castle-gate-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    plan: free
+    envVars:
+      - key: DREX_API_KEY
+        sync: false   # you must set this in the Render dashboard (never commit it)
+      - key: FRONTEND_ORIGIN
+        value: "*"
